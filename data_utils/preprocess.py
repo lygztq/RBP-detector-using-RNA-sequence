@@ -12,16 +12,16 @@ def seq2matrix(seq):
         :param seq: A RNA sequence
         :return:    a one-hot matrix with size (300 * 4)
     """
-    mat = np.zeros([len(seq), 4])
+    mat = np.zeros([4, len(seq)])
     for i in range(len(seq)):
         if seq[i] == 'A':
-            mat[i][0] = 1
+            mat[0][i] = 1
         elif seq[i] == 'C':
-            mat[i][1] = 1
+            mat[1][i] = 1
         elif seq[i] == 'G':
-            mat[i][2] = 1
+            mat[2][i] = 1
         else:
-            mat[i][3] = 1
+            mat[3][i] = 1
     return mat
 
 def preprocess():
@@ -52,7 +52,7 @@ def preprocess():
         print 'PROCESSING CLASS: %s' % class_name.CLASS_NAMES[c]
         sys.stdout.flush()
         num_instance = len(data[c])
-        one_hot_data = np.zeros([num_instance, len(data[c][0]), 4])
+        one_hot_data = np.zeros([num_instance, 4, len(data[c][0])])
         curr_label = np.array(label[c])
         for i in range(num_instance):
             one_hot_data[i] = seq2matrix(data[c][i])
