@@ -1,0 +1,16 @@
+# The dataset
+*.zip
+/data/*
+!/data/README.md
+
+# Generated file
+*.pyc
+
+# Dataset file
+*.npy
+
+# File for test
+test.py
+
+# images
+*.png
