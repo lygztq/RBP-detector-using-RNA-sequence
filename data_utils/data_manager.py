@@ -19,11 +19,12 @@ class DataManager(object):
         self.is_train = is_train
         if self.is_train:
             self.data, self.label = load_dataset(cls_name, dataset_path)
+            self._train_val_split()
         else:
             self.data = load_test_data(cls_name, dataset_path)
         self.num_data = self.data.shape[0]
         print('From DataManager: Loaded dataset size is %d, name is %s' % (self.num_data, cls_name))
-        self._train_val_split()
+            
 
     def _train_val_split(self):
         """
@@ -38,11 +39,10 @@ class DataManager(object):
         self.val_data = self.data[idx[:val_num]]
         self.train_data = self.data[idx[val_num:]]
         self.dev_data = self.data[idx[:dev_num]]
-        
-        if self.is_train:
-            self.val_label = self.label[idx[:val_num]]
-            self.train_label = self.label[idx[val_num:]]
-            self.dev_label = self.label[idx[:dev_num]]
+
+        self.val_label = self.label[idx[:val_num]]
+        self.train_label = self.label[idx[val_num:]]
+        self.dev_label = self.label[idx[:dev_num]]
 
 
 ## Test for data manager

@@ -26,7 +26,7 @@ class RNA_model(object):
     - TODO: regularization?
 
     """
-    # TODO: build_model() and test()
+    # TODO: test()
     def __init__(self, cls_name, **kwargs):
         # get parameters
         self.cls_name = cls_name
@@ -157,5 +157,14 @@ class RNA_model(object):
                     break
             saver.save(sess, self.model_save_path)
         print('Finish training')
+    
+    def test(self):
+        if self.is_train:
+            raise TypeError('This model is not for test')
+        
+        # get the dataset
+        data_manager = DataManager(self.cls_name, self.test_set_path, is_train=False)
+        test_data = DataManager.data
+        
     
                 
