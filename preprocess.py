@@ -2,6 +2,7 @@ from data_utils.load_data import read_dirs
 from data_utils.class_name import CLASS_NAMES
 import numpy as np
 import sys
+import argparse
 
 def seq2matrix(seq):
     """
@@ -24,7 +25,7 @@ def seq2matrix(seq):
             mat[3, i, 0] = 1
     return mat
 
-def preprocess():
+def preprocess(is_train=True):
     """
     Preprocessing the dataset, change the char-RNA seq into one-hot matrix.
     
@@ -41,7 +42,12 @@ def preprocess():
     # load the origin data
     print 'Loading origin data.'
     sys.stdout.flush()
-    data, label = read_dirs('./data')
+    if is_train:
+        data, label = read_dirs('./data')
+    else:
+        data = read_dirs('./data', with_label=False)
+
+
     for i in range(len(data)):
         print 'class name: ', CLASS_NAMES[i], '\tdataset size: ', len(data[i])
         sys.stdout.flush()
@@ -53,13 +59,19 @@ def preprocess():
         sys.stdout.flush()
         num_instance = len(data[c])
         one_hot_data = np.zeros([num_instance, 4, len(data[c][0]), 1], dtype=np.float32)
-        curr_label = np.array(label[c], dtype=np.float32)
         for i in range(num_instance):
             one_hot_data[i] = seq2matrix(data[c][i])
         print 'SAVING CLASS: %s' % CLASS_NAMES[c]
         sys.stdout.flush()
-        np.save('./data/data_%s' % CLASS_NAMES[c], one_hot_data)
-        np.save('./data/label_%s' % CLASS_NAMES[c], curr_label)
+        if is_train:
+            curr_label = np.array(label[c], dtype=np.float32)
+            np.save('./data/data_%s' % CLASS_NAMES[c], one_hot_data)
+            np.save('./data/label_%s' % CLASS_NAMES[c], curr_label)
+        else:
+            np.save('./data/test_data_%s' % CLASS_NAMES[c], one_hot_data)
 
 if __name__ == '__main__':
-    preprocess()
+    parser = argparse.ArgumentParser(description='Preprocess the data')
+    parser.add_argument('--test', '-t', action='store_true', help='using test mode')
+    args = parser.parse_args
+    preprocess(not args.test)

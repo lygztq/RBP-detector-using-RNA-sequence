@@ -27,7 +27,7 @@ def get_cnn_model(input_tensor):
         relu_out = tf.nn.relu(activation, name='conv_relu1') 
         pooling_out = tf.nn.max_pool(relu_out, ksize=(1,1,3,1), strides=(1,1,3,1), padding='VALID', name='conv_pool1') #(1*99*64)
         new_dim = pooling_out.shape[-1].value * pooling_out.shape[-2].value * pooling_out.shape[-3].value
-        cnn_result = tf.reshape(pooling_out, [-1, new_dim])
+        cnn_result = tf.reshape(pooling_out, [-1, new_dim]) # (N, 99*64)
     return cnn_result
 
 
