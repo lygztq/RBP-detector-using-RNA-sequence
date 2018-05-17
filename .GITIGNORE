@@ -19,5 +19,5 @@ test.py
 .vscode
 
 # checkpoints
-./checkpoint/*
-!./checkpoint/.
+/checkpoint/*
+!/checkpoint/.

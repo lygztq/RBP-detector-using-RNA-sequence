@@ -9,12 +9,14 @@ from model.param_init import kaiming_normal
 batch_size = 32
 num_epoch = 30
 learning_rate = 1e-4
+learning_rate_decay = 0.08
 
 test_name = class_name.CLASS_NAMES[1]
 manager = DataManager(cls_name=test_name, dataset_path='./data')
 sys.stdout.flush()
 
 dev_data, dev_label = manager.train_data, manager.train_label
+num_train_data = dev_data.shape[0]
 X = tf.placeholder(dev_data.dtype, [None]+list(dev_data.shape[1:]))
 y = tf.placeholder(dev_label.dtype, [None]+list(dev_label.shape[1:]))
 dataset = tf.data.Dataset.from_tensor_slices((X,y))
@@ -37,9 +39,15 @@ result = (tf.sigmoid(fc2_out) > 0.5)
 #print(result.shape, result.dtype)
 
 next_label = tf.expand_dims(next_label, -1)
-loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=next_label, logits=fc2_out), name='loss')
-optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 global_step = tf.get_variable('global_step', initializer=0, trainable=False)
+loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=next_label, logits=fc2_out), name='loss')
+lr = learning_rate
+lr = tf.train.natural_exp_decay(
+            learning_rate, global_step, 
+            decay_rate=learning_rate_decay,
+            name='learning_rate', decay_steps=num_train_data//batch_size-1)
+
+optimizer = tf.train.AdamOptimizer(learning_rate=lr)
 train_op = optimizer.minimize(loss, global_step=global_step)
 
 with tf.Session() as sess:
@@ -52,16 +60,18 @@ with tf.Session() as sess:
         last_loss = 0
         acc = 0.0
         last_step=0
+        last_lr = 0.0
         while True:
             try:
-                curr_loss, train, ret, curr_label, step = sess.run([loss, train_op, result, next_label, global_step])
+                curr_loss, train, ret, curr_label, step, clr = sess.run([loss, train_op, result, next_label, global_step, lr])
                 last_loss = curr_loss
                 acc = (cnt*acc + np.sum(curr_label==ret, dtype=np.float)/batch_size) / (cnt+1)
                 last_step = step
+                last_lr = clr
                 # print('iterator: %d/%d\t\tloss: %f' % (cnt, total, curr_loss))
                 cnt+=1
             except tf.errors.OutOfRangeError:
-                print('Epoch %d/%d\t\tloss: %f\t\tacc: %f\t\tstep: %d' % (i+1, num_epoch, last_loss, acc, last_step))
+                print('Epoch %d/%d\t\tloss: %f\t\tacc: %f\t\tstep: %d\t\tlearning_rate: %f' % (i+1, num_epoch, last_loss, acc, last_step, last_lr))
                 break
 
     sess.run(iterator.initializer, feed_dict={X:manager.val_data, y:manager.val_label})
