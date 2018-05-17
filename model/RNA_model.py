@@ -164,7 +164,39 @@ class RNA_model(object):
         
         # get the dataset
         data_manager = DataManager(self.cls_name, self.test_set_path, is_train=False)
-        test_data = DataManager.data
+        test_data = data_manager.data
+        num_test_data = test_data.shape[0]
+        X = tf.placeholder(test_data.dtype, [None]+list(test_data.shape[1:]))
+        dataset = tf.data.Dataset.from_tensor_slices(X)
+        dataset = dataset.batch(self.batch_size)
+
+        iterator = dataset.make_initializable_iterator()
+        batch_data = iterator.get_next()
         
+        fc2_out, result = self.build_model(batch_data)
+        with tf.variable_scope('cnn', reuse=True):
+            conv_w1 = tf.get_variable('conv_w1')
+            conv_b1 = tf.get_variable('conv_b1')
+        with tf.variable_scope('fc_net', reuse=True):
+            fc_w1 = tf.get_variable('fc_w1')
+            fc_b1 = tf.get_variable('fc_b1')
+            fc_w2 = tf.get_variable('fc_w2')
+            fc_b2 = tf.get_variable('fc_b2')
+        weights = [conv_w1, conv_b1, fc_w1, fc_b1, fc_w2, fc_b2]
+        saver = tf.train.Saver(weights)
+
+        with tf.Session() as sess:
+            sess.run(tf.global_variables_initializer())
+            sess.run(iterator.initializer, feed_dict={X:test_data})
+            saver.restore(sess, self.model_save_path)
+            while True:
+                try:
+                    curr_result = sess.run(result)
+                    curr_result_int = curr_result.astype(np.int)
+                except tf.errors.OutOfRangeError:
+                    break
+
+        
+
     
                 
