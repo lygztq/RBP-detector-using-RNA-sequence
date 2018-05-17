@@ -17,3 +17,7 @@ test.py
 
 # vscode dir
 .vscode
+
+# checkpoints
+./checkpoint/*
+!./checkpoint/.
