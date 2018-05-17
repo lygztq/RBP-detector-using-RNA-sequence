@@ -1,5 +1,5 @@
 import numpy as np
-import class_name
+from data_utils.class_name import CLASS_NAMES, CLASS_NUM
 import os
 
 def read_file(file_path):
@@ -29,8 +29,8 @@ def read_dirs(dir_path):
     :param dir_path: The path that contains the whole dataset.
     :Return : data(num_class, num_instance, len_instance) and label(num_class, num_instance)
     """ 
-    names = class_name.CLASS_NAMES
-    cls_num = class_name.CLASS_NUM
+    names = CLASS_NAMES
+    cls_num = CLASS_NUM
     datas = []
     labels = []
 

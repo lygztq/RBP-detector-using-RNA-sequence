@@ -6,4 +6,4 @@ def kaiming_normal(shape):
         fan_in, fan_out = shape[0], shape[1]
     elif len(shape) == 4:
         fan_in, fan_out = np.prod(shape[:3]), shape[3]
-    return tf.random_normal(shape) * np.sqrt(2.0 / fan_in)
+    return tf.random_normal(shape, dtype=tf.float32) * np.sqrt(2.0 / fan_in)

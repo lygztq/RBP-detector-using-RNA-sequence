@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.contrib import layers
 import numpy as np
-from param_init import kaiming_normal
+from model.param_init import kaiming_normal
 
 def get_cnn_model(input_tensor):
     """
@@ -11,22 +11,24 @@ def get_cnn_model(input_tensor):
     :param input_tensor: input tensor of CNN with shape (N, 4, 300, 1) (N, H, W, C)
     :Return flatten_tensor: the input of next part of model
     """
-    N, H, W, C = input_tensor.shape
+    N, H, W, C = [i.value for i in input_tensor.shape]
+    N = input_tensor.shape[0]
     conv_size = 4
-    pooling_size = 2
-
     #regularizer = layers.l2_regularizer()
     with tf.variable_scope('cnn'):
         conv_w1 = tf.get_variable(
             'conv_w1', 
-            shape=[conv_size, conv_size, C, 64], 
+            #shape=[conv_size, conv_size, C, 64], 
             initializer=kaiming_normal((conv_size, conv_size, C, 64)),
-            dtype=tf.float64
+            dtype=tf.float32
             )
-        conv_b1 = tf.zeros(shape=[64] ,name='conv_b1', dtype=tf.float64) 
-        activation = tf.nn.conv2d(input_tensor, conv_w1, strides=(1,1,1,1), padding='VALID') + conv_b1 #(1*297)
-        relu_out = tf.nn.relu(activation) 
-        pooling_out = tf.nn.max_pool(relu_out, ksize=(1,1,3,1), strides=(1,1,3,1), padding='VALID') #(1*99)
+        conv_b1 = tf.zeros(shape=[64] ,name='conv_b1', dtype=tf.float32) 
+        activation = tf.nn.conv2d(input_tensor, conv_w1, strides=(1,1,1,1), padding='VALID', name='conv_activation1') + conv_b1 #(1*297*64)
+        relu_out = tf.nn.relu(activation, name='conv_relu1') 
+        pooling_out = tf.nn.max_pool(relu_out, ksize=(1,1,3,1), strides=(1,1,3,1), padding='VALID', name='conv_pool1') #(1*99*64)
+        new_dim = pooling_out.shape[-1].value * pooling_out.shape[-2].value * pooling_out.shape[-3].value
+        cnn_result = tf.reshape(pooling_out, [-1, new_dim])
+    return cnn_result
 
 
 

@@ -1,5 +1,5 @@
-from load_data import read_dirs
-import class_name
+from data_utils.load_data import read_dirs
+from data_utils.class_name import CLASS_NAMES
 import numpy as np
 import sys
 
@@ -12,16 +12,16 @@ def seq2matrix(seq):
         :param seq: A RNA sequence
         :return:    a one-hot matrix with size (300 * 4)
     """
-    mat = np.zeros([4, len(seq)])
+    mat = np.zeros([4, len(seq), 1], dtype=np.float32)
     for i in range(len(seq)):
         if seq[i] == 'A':
-            mat[0][i] = 1
+            mat[0, i, 0] = 1
         elif seq[i] == 'C':
-            mat[1][i] = 1
+            mat[1, i, 0] = 1
         elif seq[i] == 'G':
-            mat[2][i] = 1
+            mat[2, i, 0] = 1
         else:
-            mat[3][i] = 1
+            mat[3, i, 0] = 1
     return mat
 
 def preprocess():
@@ -41,25 +41,25 @@ def preprocess():
     # load the origin data
     print 'Loading origin data.'
     sys.stdout.flush()
-    data, label = read_dirs('../data')
+    data, label = read_dirs('./data')
     for i in range(len(data)):
-        print 'class name: ', class_name.CLASS_NAMES[i], '\tdataset size: ', len(data[i])
+        print 'class name: ', CLASS_NAMES[i], '\tdataset size: ', len(data[i])
         sys.stdout.flush()
 
     num = len(data)
 
     for c in range(num):
-        print 'PROCESSING CLASS: %s' % class_name.CLASS_NAMES[c]
+        print 'PROCESSING CLASS: %s\t\t\t%d / %d' % (CLASS_NAMES[c], c, num)
         sys.stdout.flush()
         num_instance = len(data[c])
-        one_hot_data = np.zeros([num_instance, 4, len(data[c][0])])
-        curr_label = np.array(label[c])
+        one_hot_data = np.zeros([num_instance, 4, len(data[c][0]), 1], dtype=np.float32)
+        curr_label = np.array(label[c], dtype=np.float32)
         for i in range(num_instance):
             one_hot_data[i] = seq2matrix(data[c][i])
-        print 'SAVING CLASS: %s' % class_name.CLASS_NAMES[c]
+        print 'SAVING CLASS: %s' % CLASS_NAMES[c]
         sys.stdout.flush()
-        np.save('../data/data_%s' % class_name.CLASS_NAMES[c], one_hot_data)
-        np.save('../data/label_%s' % class_name.CLASS_NAMES[c], curr_label)
+        np.save('./data/data_%s' % CLASS_NAMES[c], one_hot_data)
+        np.save('./data/label_%s' % CLASS_NAMES[c], curr_label)
 
 if __name__ == '__main__':
     preprocess()
