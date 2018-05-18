@@ -22,7 +22,7 @@ class RNA_model(object):
     - fc_hidden_num:        num of hidden layer in fully-connented net
     - is_train:             train or test
     - test_set_path:        the path of test dataset
-    - TODO: dropout?
+    - keep_prob:            the keep probability for dropout 
     - TODO: regularization?
 
     """
@@ -40,6 +40,7 @@ class RNA_model(object):
         self.is_train = kwargs.pop('is_train', True)
         self.use_decay = kwargs.pop('use_decay', False)
         self.test_set_path = kwargs.pop('test_set_path', None)
+        self.keep_prob = kwargs.pop('keep_prob', 1.0)
 
         # do some check
         if self.cls_name not in CLASS_NAMES:
@@ -57,7 +58,7 @@ class RNA_model(object):
                 raise ValueError('Invalid path or can not find checkpoints for this model')
     
     
-    def build_model(self, batch_data, is_train=True):
+    def build_model(self, batch_data, keep_prob, is_train=True):
         """
         Build computational graph for model
         :param batch_data: input tensor
@@ -75,7 +76,8 @@ class RNA_model(object):
             fc_b2 = tf.get_variable('fc_b2', initializer=tf.zeros([1]), dtype=tf.float32)
             # fc_b2 = tf.zeros(name='fc_b2', shape=(1), dtype=tf.float32)
             fc1_out = tf.nn.relu(tf.matmul(cnn_out, fc_w1) + fc_b1)
-            fc2_out = tf.matmul(fc1_out, fc_w2) + fc_b2
+            dropout_fc1_out = tf.nn.dropout(fc1_out, keep_prob)
+            fc2_out = tf.matmul(dropout_fc1_out, fc_w2) + fc_b2
 
         result = (tf.sigmoid(fc2_out) > 0.5)
         return fc2_out, result
@@ -101,7 +103,8 @@ class RNA_model(object):
         batch_label = tf.expand_dims(batch_label, -1)
         
         # build model and get parameters
-        fc2_out, result = self.build_model(batch_data)
+        dropout_keep_prob = tf.placeholder(tf.float32)
+        fc2_out, result = self.build_model(batch_data, dropout_keep_prob)
         with tf.variable_scope('cnn', reuse=True):
             conv_w1 = tf.get_variable('conv_w1')
             conv_b1 = tf.get_variable('conv_b1')
@@ -135,7 +138,10 @@ class RNA_model(object):
                 last_loss, acc = 0.0, 0.0
                 while True:
                     try:
-                        curr_loss, train, curr_result, curr_label = sess.run([loss, train_op, result, batch_label])
+                        curr_loss, train, curr_result, curr_label = sess.run(
+                            [loss, train_op, result, batch_label],
+                            feed_dict={dropout_keep_prob: self.keep_prob}
+                            )
                         acc = (cnt*acc + np.sum(curr_label==curr_result, dtype=np.float)/self.batch_size) / (cnt+1)
                         last_loss = curr_loss
                         cnt+=1
@@ -149,7 +155,7 @@ class RNA_model(object):
             cnt = 0
             while True:
                 try:
-                    curr_result, curr_label = sess.run([result, batch_label])
+                    curr_result, curr_label = sess.run([result, batch_label], feed_dict={dropout_keep_prob: 1.0})
                     val_acc = (cnt*val_acc + np.sum(curr_label==curr_result, dtype=np.float)/self.batch_size) / (cnt+1)
                     cnt+=1
                 except tf.errors.OutOfRangeError:
@@ -173,7 +179,7 @@ class RNA_model(object):
         iterator = dataset.make_initializable_iterator()
         batch_data = iterator.get_next()
         
-        fc2_out, result = self.build_model(batch_data)
+        _, result = self.build_model(batch_data)
         with tf.variable_scope('cnn', reuse=True):
             conv_w1 = tf.get_variable('conv_w1')
             conv_b1 = tf.get_variable('conv_b1')
@@ -195,6 +201,7 @@ class RNA_model(object):
                     curr_result_int = curr_result.astype(np.int)
                 except tf.errors.OutOfRangeError:
                     break
+        
 
         
 

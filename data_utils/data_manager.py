@@ -19,10 +19,11 @@ class DataManager(object):
         self.is_train = is_train
         if self.is_train:
             self.data, self.label = load_dataset(cls_name, dataset_path)
+            self.num_data = self.data.shape[0]
             self._train_val_split()
         else:
             self.data = load_test_data(cls_name, dataset_path)
-        self.num_data = self.data.shape[0]
+            self.num_data = self.data.shape[0]
         print('From DataManager: Loaded dataset size is %d, name is %s' % (self.num_data, cls_name))
             
 
