@@ -10,7 +10,7 @@
 *.npy
 
 # File for test
-test.py
+# test.py
 
 # images
 *.png
