@@ -2,6 +2,7 @@ import sys, os
 import tensorflow as tf
 import numpy as np
 from model.cnn import get_cnn_model
+from model.rnn import biLSTM
 from model.param_init import kaiming_normal
 from data_utils.data_manager import DataManager
 from data_utils.class_name import CLASS_NAMES
@@ -23,6 +24,7 @@ class RNA_model(object):
     - is_train:             train or test
     - test_set_path:        the path of test dataset
     - keep_prob:            the keep probability for dropout 
+    - use_rnn:              whether use rnn
     - TODO: regularization?
 
     """
@@ -41,6 +43,7 @@ class RNA_model(object):
         self.use_decay = kwargs.pop('use_decay', False)
         self.test_set_path = kwargs.pop('test_set_path', None)
         self.keep_prob = kwargs.pop('keep_prob', 1.0)
+        self.use_rnn = kwargs.pop('use_rnn', False)
 
         # do some check
         if self.cls_name not in CLASS_NAMES:
@@ -58,7 +61,7 @@ class RNA_model(object):
                 raise ValueError('Invalid path or can not find checkpoints for this model')
     
     
-    def build_model(self, batch_data, keep_prob, is_train=True):
+    def build_model(self, batch_data, keep_prob, reuse=False):
         """
         Build computational graph for model
         :param batch_data: input tensor
@@ -66,16 +69,26 @@ class RNA_model(object):
         Return the output of model
         """
         # cnn part
-        cnn_out = get_cnn_model(batch_data) #(N, D)
+        cnn_out = get_cnn_model(batch_data) #(N, 99, 64)
+
+
+        # rnn part
+        if self.use_rnn:
+            rnn_out = biLSTM(cnn_out)
+            nn_out = rnn_out
+        else:
+            new_dim = np.prod([i.value for i in cnn_out.shape[1:]])
+            nn_out = tf.reshape(cnn_out, [-1, new_dim])
+
         # the fully-connected net part
-        with tf.variable_scope('fc_net'):
-            fc_w1 = tf.get_variable('fc_w1', initializer=kaiming_normal((cnn_out.shape[1].value, self.fc_hidden_num)), dtype=tf.float32)
+        with tf.variable_scope('fc_net', reuse=reuse):
+            fc_w1 = tf.get_variable('fc_w1', initializer=kaiming_normal((nn_out.shape[1].value, self.fc_hidden_num)), dtype=tf.float32)
             fc_b1 = tf.get_variable('fc_b1', initializer=tf.zeros([self.fc_hidden_num]), dtype=tf.float32)
             # fc_b1 = tf.zeros(name='fc_b1', shape=(self.fc_hidden_num), dtype=tf.float32)
             fc_w2 = tf.get_variable('fc_w2', initializer=kaiming_normal((self.fc_hidden_num, 1)), dtype=tf.float32)
             fc_b2 = tf.get_variable('fc_b2', initializer=tf.zeros([1]), dtype=tf.float32)
             # fc_b2 = tf.zeros(name='fc_b2', shape=(1), dtype=tf.float32)
-            fc1_out = tf.nn.relu(tf.matmul(cnn_out, fc_w1) + fc_b1)
+            fc1_out = tf.nn.relu(tf.matmul(nn_out, fc_w1) + fc_b1)
             dropout_fc1_out = tf.nn.dropout(fc1_out, keep_prob)
             fc2_out = tf.matmul(dropout_fc1_out, fc_w2) + fc_b2
 
@@ -105,16 +118,20 @@ class RNA_model(object):
         # build model and get parameters
         dropout_keep_prob = tf.placeholder(tf.float32)
         fc2_out, result = self.build_model(batch_data, dropout_keep_prob)
-        with tf.variable_scope('cnn', reuse=True):
-            conv_w1 = tf.get_variable('conv_w1')
-            conv_b1 = tf.get_variable('conv_b1')
-        with tf.variable_scope('fc_net', reuse=True):
-            fc_w1 = tf.get_variable('fc_w1')
-            fc_b1 = tf.get_variable('fc_b1')
-            fc_w2 = tf.get_variable('fc_w2')
-            fc_b2 = tf.get_variable('fc_b2')
-        weights = [conv_w1, conv_b1, fc_w1, fc_b1, fc_w2, fc_b2]
-        saver = tf.train.Saver(weights)
+        # with tf.variable_scope('cnn', reuse=True):
+        #     conv_w1 = tf.get_variable('conv_w1')
+        #     conv_b1 = tf.get_variable('conv_b1')
+        # with tf.variable_scope('rnn', reuse=True):
+        #     lstm_fw_cell = tf.get_variable('lstm_fw_cell')
+        #     lstm_bw_cell = tf.get_variable('lstm_fw_cell')
+        # with tf.variable_scope('fc_net', reuse=True):
+        #     fc_w1 = tf.get_variable('fc_w1')
+        #     fc_b1 = tf.get_variable('fc_b1')
+        #     fc_w2 = tf.get_variable('fc_w2')
+        #     fc_b2 = tf.get_variable('fc_b2')
+        # weights = [conv_w1, conv_b1, lstm_fw_cell, lstm_bw_cell, fc_w1, fc_b1, fc_w2, fc_b2]
+        # saver = tf.train.Saver(weights)
+        saver = tf.train.Saver()
 
         # training part
         loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=batch_label, logits=fc2_out), name='loss')
@@ -163,6 +180,7 @@ class RNA_model(object):
                     break
             saver.save(sess, self.model_save_path)
         print('Finish training')
+        sys.stdout.flush()
     
     def test(self):
         if self.is_train:
@@ -179,25 +197,30 @@ class RNA_model(object):
         iterator = dataset.make_initializable_iterator()
         batch_data = iterator.get_next()
         
-        _, result = self.build_model(batch_data)
-        with tf.variable_scope('cnn', reuse=True):
-            conv_w1 = tf.get_variable('conv_w1')
-            conv_b1 = tf.get_variable('conv_b1')
-        with tf.variable_scope('fc_net', reuse=True):
-            fc_w1 = tf.get_variable('fc_w1')
-            fc_b1 = tf.get_variable('fc_b1')
-            fc_w2 = tf.get_variable('fc_w2')
-            fc_b2 = tf.get_variable('fc_b2')
-        weights = [conv_w1, conv_b1, fc_w1, fc_b1, fc_w2, fc_b2]
-        saver = tf.train.Saver(weights)
+        dropout_keep_prob = tf.placeholder(tf.float32)
+        _, result = self.build_model(batch_data, dropout_keep_prob, reuse=True)
+        # with tf.variable_scope('cnn', reuse=True):
+        #     conv_w1 = tf.get_variable('conv_w1')
+        #     conv_b1 = tf.get_variable('conv_b1')
+        # with tf.variable_scope('rnn', reuse=True):
+        #     lstm_fw_cell = tf.get_variable('lstm_fw_cell')
+        #     lstm_bw_cell = tf.get_variable('lstm_fw_cell')
+        # with tf.variable_scope('fc_net', reuse=True):
+        #     fc_w1 = tf.get_variable('fc_w1')
+        #     fc_b1 = tf.get_variable('fc_b1')
+        #     fc_w2 = tf.get_variable('fc_w2')
+        #     fc_b2 = tf.get_variable('fc_b2')
+        # weights = [conv_w1, conv_b1, lstm_fw_cell, lstm_bw_cell, fc_w1, fc_b1, fc_w2, fc_b2]
+        # saver = tf.train.Saver(weights)
+        saver = tf.train.Saver()
 
         with tf.Session() as sess:
-            sess.run(tf.global_variables_initializer())
+            #sess.run(tf.global_variables_initializer())
             sess.run(iterator.initializer, feed_dict={X:test_data})
             saver.restore(sess, self.model_save_path)
             while True:
                 try:
-                    curr_result = sess.run(result)
+                    curr_result = sess.run(result, feed_dict={dropout_keep_prob: 1.0})
                     curr_result_int = curr_result.astype(np.int)
                 except tf.errors.OutOfRangeError:
                     break
