@@ -118,34 +118,22 @@ class RNA_model(object):
         # build model and get parameters
         dropout_keep_prob = tf.placeholder(tf.float32)
         fc2_out, result = self.build_model(batch_data, dropout_keep_prob)
-        # with tf.variable_scope('cnn', reuse=True):
-        #     conv_w1 = tf.get_variable('conv_w1')
-        #     conv_b1 = tf.get_variable('conv_b1')
-        # with tf.variable_scope('rnn', reuse=True):
-        #     lstm_fw_cell = tf.get_variable('lstm_fw_cell')
-        #     lstm_bw_cell = tf.get_variable('lstm_fw_cell')
-        # with tf.variable_scope('fc_net', reuse=True):
-        #     fc_w1 = tf.get_variable('fc_w1')
-        #     fc_b1 = tf.get_variable('fc_b1')
-        #     fc_w2 = tf.get_variable('fc_w2')
-        #     fc_b2 = tf.get_variable('fc_b2')
-        # weights = [conv_w1, conv_b1, lstm_fw_cell, lstm_bw_cell, fc_w1, fc_b1, fc_w2, fc_b2]
-        # saver = tf.train.Saver(weights)
         saver = tf.train.Saver()
 
         # training part
         loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=batch_label, logits=fc2_out), name='loss')
-        global_step = tf.get_variable('global_step', initializer=0, trainable=False)
+        global_step = tf.get_variable('global_step', initializer=0.0, trainable=False)
         # decayed_learning_rate = learning_rate * exp(-decay_rate * global_step)
-        learning_rate = self.learning_rate
+        learning_rate = tf.get_variable('learning_rate', initializer=self.learning_rate, dtype=tf.float32)
         if self.use_decay:
             learning_rate = tf.train.natural_exp_decay(
-                learning_rate, global_step, 
+                self.learning_rate, global_step, 
                 decay_rate=self.learning_rate_decay,
-                name='learning_rate', decay_steps=num_train_data//self.batch_size)
+                name='learning_rate', decay_steps=1)
         
         optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-        train_op = optimizer.minimize(loss, global_step=global_step)
+        train_op = optimizer.minimize(loss)
+        global_step_add = tf.assign_add(global_step, 1)
 
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
@@ -164,6 +152,9 @@ class RNA_model(object):
                         cnt+=1
                     except tf.errors.OutOfRangeError:
                         print('Epoch %d/%d\t\tloss: %f\t\tacc: %f' % (i+1, self.num_epoch, last_loss, acc))
+                        sess.run([global_step_add])
+                        g_s, lr = sess.run([global_step, learning_rate])
+                        print ('learning_rate: %f\t\tglobal_step: %d' % (lr, g_s))
                         break
             
             # validation
