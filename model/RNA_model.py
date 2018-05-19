@@ -65,16 +65,19 @@ class RNA_model(object):
         """
         Build computational graph for model
         :param batch_data: input tensor
+        :param keep_prob:  the keep probability of dropout
+        :reuse:            use new parameters or old parameters(i.e. if new, for training,
+                           if old, for test)
         
         Return the output of model
         """
         # cnn part
-        cnn_out = get_cnn_model(batch_data) #(N, 99, 64)
+        cnn_out = get_cnn_model(batch_data, reuse=reuse) #(N, 99, 64)
 
 
         # rnn part
         if self.use_rnn:
-            rnn_out = biLSTM(cnn_out)
+            rnn_out = biLSTM(cnn_out, reuse=reuse)
             nn_out = rnn_out
         else:
             new_dim = np.prod([i.value for i in cnn_out.shape[1:]])
@@ -98,8 +101,10 @@ class RNA_model(object):
 
 
     def train(self):
+        # check
         if not self.is_train:
             raise TypeError('This model is not for training.')
+
         # get the dataset
         data_manager = DataManager(cls_name=self.cls_name, dataset_path=self.dataset_path)
         sys.stdout.flush()
@@ -190,19 +195,6 @@ class RNA_model(object):
         
         dropout_keep_prob = tf.placeholder(tf.float32)
         _, result = self.build_model(batch_data, dropout_keep_prob, reuse=True)
-        # with tf.variable_scope('cnn', reuse=True):
-        #     conv_w1 = tf.get_variable('conv_w1')
-        #     conv_b1 = tf.get_variable('conv_b1')
-        # with tf.variable_scope('rnn', reuse=True):
-        #     lstm_fw_cell = tf.get_variable('lstm_fw_cell')
-        #     lstm_bw_cell = tf.get_variable('lstm_fw_cell')
-        # with tf.variable_scope('fc_net', reuse=True):
-        #     fc_w1 = tf.get_variable('fc_w1')
-        #     fc_b1 = tf.get_variable('fc_b1')
-        #     fc_w2 = tf.get_variable('fc_w2')
-        #     fc_b2 = tf.get_variable('fc_b2')
-        # weights = [conv_w1, conv_b1, lstm_fw_cell, lstm_bw_cell, fc_w1, fc_b1, fc_w2, fc_b2]
-        # saver = tf.train.Saver(weights)
         saver = tf.train.Saver()
 
         with tf.Session() as sess:

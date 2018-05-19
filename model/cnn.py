@@ -3,7 +3,7 @@ from tensorflow.contrib import layers
 import numpy as np
 from model.param_init import kaiming_normal
 
-def get_cnn_model(input_tensor):
+def get_cnn_model(input_tensor, reuse=False):
     """
     Get the CNN part of the model, the structure of the CNN is:
         conv(64, 4*4, stride=1, valid) -> relu -> [not use conv(64, 1*4, stride=1, valid) -> relu] -> max_pooling(2) -> faltten
@@ -15,7 +15,7 @@ def get_cnn_model(input_tensor):
     N = input_tensor.shape[0]
     conv_size = 4
     #regularizer = layers.l2_regularizer()
-    with tf.variable_scope('cnn'):
+    with tf.variable_scope('cnn', reuse=reuse):
         conv_w1 = tf.get_variable(
             'conv_w1', 
             #shape=[conv_size, conv_size, C, 64], 

@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
-def biLSTM(input_tensor):
+def biLSTM(input_tensor, reuse=False):
     """
     The bidirectional lstm part of the model
     the input_tensor size should be (batch_size, 99, num_cnn_filter(default is 64))
@@ -15,7 +15,7 @@ def biLSTM(input_tensor):
     input_tensor = tf.unstack(input_tensor, T, axis=1)
 
     # define lstm cells, let the hidden cell num is D
-    with tf.variable_scope('rnn'):
+    with tf.variable_scope('rnn', reuse=reuse):
         lstm_fw_cell = tf.contrib.rnn.BasicLSTMCell(hidden_dim, name='lstm_fw_cell')
         lstm_bw_cell = tf.contrib.rnn.BasicLSTMCell(hidden_dim, name='lstm_bw_cell')
         try:
