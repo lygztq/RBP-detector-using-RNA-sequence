@@ -14,6 +14,7 @@
 
 # images
 *.png
+!/images/RNA-Binding.PNG
 
 # vscode dir
 .vscode
