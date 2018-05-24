@@ -2,6 +2,15 @@ import numpy as np
 from data_utils.class_name import CLASS_NAMES, CLASS_NUM
 import os
 
+def write_file(file_path, data, with_label=False, label=None):
+    with open(file_path, 'w') as target_file:
+        for i, d in enumerate(data):
+            target_file.write(d+'\t')
+            if with_label:
+                target_file.write(str(label[i]))
+            target_file.write('\n')
+
+
 def read_file(file_path, with_label=True):
     """
     Read data from a file
@@ -11,12 +20,14 @@ def read_file(file_path, with_label=True):
     
     :Return : two numpy array contain the data and the label 
     """
-    contain = open(file_path)
+    contain = open(file_path, 'r')
     data = []
     if with_label:
         label = []
 
     for line in contain:
+        # if line == "":
+        #     continue
         line = line.split()
         data.append(line[0])
         if with_label:
@@ -37,20 +48,22 @@ def read_dirs(dir_path, with_label=True):
     """ 
     names = CLASS_NAMES
     cls_num = CLASS_NUM
-    datas = []
+    datas = {}
     if with_label:
-        labels = []
+        labels = {}
 
-    for i in range(cls_num):
-        name = names[i]
-        if with_label:
-            file_name = os.path.join(dir_path, name, 'train')
-            data, label = read_file(file_name)
-            labels.append(label)
-        else:
-            file_name = os.path.join(dir_path, name, 'test')
-            data = read_file(file_name, with_label=False)
-        datas.append(data)
+    for n in names:
+        try:
+            if with_label:
+                file_name = os.path.join(dir_path, n, 'train')
+                data, label = read_file(file_name)
+                labels[n] = label
+            else:
+                file_name = os.path.join(dir_path, n, 'test')
+                data = read_file(file_name, with_label=False)
+            datas[n] = data
+        except:
+            print("Can not find raw data for %s" % n)
         
     if with_label:
         return datas, labels
@@ -78,6 +91,7 @@ def load_test_data(cls_name, path='../data'):
     """
     test_data_file_name = 'test_data_%s.npy' % cls_name
     test_data_path = os.path.join(path, test_data_file_name)
+    
     test_data = np.load(test_data_path)
     return test_data
 

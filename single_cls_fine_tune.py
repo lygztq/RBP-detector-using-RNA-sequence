@@ -10,7 +10,7 @@ learning_rate = 1e-3
 learning_rate_decay = 0.02
 reg_strength = 1e-4
 
-test_name = CLASS_NAMES[0]
+test_name = CLASS_NAMES[35]
 
 model = RNA_model(
     cls_name=test_name, batch_size=batch_size,

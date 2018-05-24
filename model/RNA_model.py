@@ -99,7 +99,7 @@ class RNA_model(object):
             fc_w2 = tf.get_variable('fc_w2', initializer=kaiming_normal((self.fc_hidden_num, 1)), dtype=tf.float32)
             fc_b2 = tf.get_variable('fc_b2', initializer=tf.zeros([1]), dtype=tf.float32)
             # fc_b2 = tf.zeros(name='fc_b2', shape=(1), dtype=tf.float32)
-            dropout_nn_out = tf.nn.dropout(nn_out, 2*keep_prob)
+            dropout_nn_out = tf.nn.dropout(nn_out, keep_prob)
             fc1_out = tf.nn.leaky_relu(tf.matmul(dropout_nn_out, fc_w1) + fc_b1, alpha=self.leaky_relu_alpha)
             dropout_fc1_out = tf.nn.dropout(fc1_out, keep_prob)
             fc2_out = tf.matmul(dropout_fc1_out, fc_w2) + fc_b2
@@ -120,8 +120,8 @@ class RNA_model(object):
         sys.stdout.flush()
         train_data, train_label = data_manager.train_data, data_manager.train_label
         num_train_data = train_data.shape[0]
-        X = tf.placeholder(train_data.dtype, [None]+list(train_data.shape[1:]))
-        y = tf.placeholder(train_label.dtype, [None]+list(train_label.shape[1:]))
+        X = tf.placeholder(train_data.dtype, [None]+list(train_data.shape[1:]), name='input_data')
+        y = tf.placeholder(train_label.dtype, [None]+list(train_label.shape[1:]), name='input_label')
         dataset = tf.data.Dataset.from_tensor_slices((X, y))
         dataset = dataset.shuffle(buffer_size=8000)
         batched_dataset = dataset.batch(self.batch_size)
@@ -131,7 +131,7 @@ class RNA_model(object):
         batch_label = tf.expand_dims(batch_label, -1)
         
         # build model and get parameters
-        dropout_keep_prob = tf.placeholder(tf.float32)
+        dropout_keep_prob = tf.placeholder(tf.float32, name='keep_prob')
         fc2_out, result = self.build_model(batch_data, dropout_keep_prob)
         saver = tf.train.Saver()
 
@@ -193,6 +193,7 @@ class RNA_model(object):
                 sess.run(iterator.initializer, feed_dict={X:data_manager.val_data, y:data_manager.val_label})
                 val_acc = 0.0
                 cnt = 0
+                best_acc = 0.0
                 while True:
                     try:
                         curr_result, curr_label = sess.run([result, batch_label], feed_dict={dropout_keep_prob: 1.0})
@@ -201,8 +202,12 @@ class RNA_model(object):
                     except tf.errors.OutOfRangeError:
                         print('validation acc: %f' % val_acc)
                         val_acc_hist.append(val_acc)
+                        if val_acc > best_acc and val_acc > 0.76:
+                            best_acc = val_acc
+                            saver.save(sess, self.model_save_path)
                         break
-            saver.save(sess, self.model_save_path)
+                if best_acc <= 0.76:
+                    saver.save(sess, self.model_save_path)
         if not os.path.exists('./train_record'):
             os.makedirs('./train_record')
         if self.plot:
@@ -223,10 +228,9 @@ class RNA_model(object):
                 for i in val_acc_hist:
                     rec_file.write(str(i) + '\t')
 
-        final_acc = val_acc_hist[-1]
         print('Finish training')
         sys.stdout.flush()
-        return final_acc
+        return best_acc
     
     def test(self):
         tf.reset_default_graph()
@@ -234,30 +238,35 @@ class RNA_model(object):
             raise TypeError('This model is not for test')
         
         # get the dataset
-        data_manager = DataManager(self.cls_name, self.test_set_path, is_train=False)
+        data_manager = DataManager(self.test_set_path, self.cls_name, is_train=False)
         test_data = data_manager.data
         num_test_data = test_data.shape[0]
-        X = tf.placeholder(test_data.dtype, [None]+list(test_data.shape[1:]))
+        X = tf.placeholder(test_data.dtype, [None]+list(test_data.shape[1:]), name='input_data')
         dataset = tf.data.Dataset.from_tensor_slices(X)
         dataset = dataset.batch(self.batch_size)
 
         iterator = dataset.make_initializable_iterator()
         batch_data = iterator.get_next()
         
-        dropout_keep_prob = tf.placeholder(tf.float32)
-        _, result = self.build_model(batch_data, dropout_keep_prob, reuse=True)
+        dropout_keep_prob = tf.placeholder(tf.float32, name='keep_prob')
+        _, result = self.build_model(batch_data, dropout_keep_prob, reuse=False)
         saver = tf.train.Saver()
 
         with tf.Session() as sess:
             #sess.run(tf.global_variables_initializer())
             sess.run(iterator.initializer, feed_dict={X:test_data})
             saver.restore(sess, self.model_save_path)
+            result_data = []
+            result_label = []
             while True:
                 try:
-                    curr_result = sess.run(result, feed_dict={dropout_keep_prob: 1.0})
+                    curr_data, curr_result = sess.run([batch_data, result], feed_dict={dropout_keep_prob: 1.0})
                     curr_result_int = curr_result.astype(np.int)
+                    result_data.append(curr_data)
+                    result_label.append(curr_result)
                 except tf.errors.OutOfRangeError:
                     break
+        return result_data, result_label
         
 
         
