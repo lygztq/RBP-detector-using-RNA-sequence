@@ -1,7 +1,6 @@
 import sys, os
 import tensorflow as tf
 import numpy as np
-import matplotlib.pyplot as plt 
 from model.cnn import get_cnn_model
 from model.rnn import biLSTM
 from model.param_init import kaiming_normal
@@ -211,6 +210,7 @@ class RNA_model(object):
         if not os.path.exists('./train_record'):
             os.makedirs('./train_record')
         if self.plot:
+            import matplotlib.pyplot as plt 
             plt.figure(1)
             plt.grid(True)
             plt.plot(np.array(train_acc_hist), 'b-', label="train_acc")
