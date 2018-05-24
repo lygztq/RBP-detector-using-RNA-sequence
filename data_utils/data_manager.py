@@ -7,7 +7,7 @@ class DataManager(object):
     """
     The class of data manager
     """
-    def __init__(self, dataset_path, cls_name, val_ratio=0.1, dev_ratio=0.1, is_train=True):
+    def __init__(self, dataset_path, cls_name, val_ratio=0.1, dev_ratio=0.1, is_train=True, use_augmentation=False):
         """
             :param dataset_path:    The path of the dataset
             :param ratio:           (validation_set_size) / (total_dataset_size)
@@ -17,10 +17,13 @@ class DataManager(object):
         self.val_ratio = val_ratio
         self.dev_ratio = dev_ratio
         self.is_train = is_train
+        self.use_augmentation = use_augmentation
         if self.is_train:
             self.data, self.label = load_dataset(cls_name, dataset_path)
             self.num_data = self.data.shape[0]
             self._train_val_split()
+            if self.use_augmentation:
+                print('training set with data augmentation is %d' % self.train_data.shape[0])
         else:
             self.data = load_test_data(cls_name, dataset_path)
             self.num_data = self.data.shape[0]
@@ -38,11 +41,17 @@ class DataManager(object):
         self.num_train = self.num_data - val_num
 
         self.val_data = self.data[idx[:val_num]]
-        self.train_data = self.data[idx[val_num:]]
+        if self.use_augmentation:
+            self.train_data = np.vstack( (self.data[idx[val_num:]], self.data[idx[val_num:],::-1]) )
+        else:
+            self.train_data = self.data[idx[val_num:]]
         self.dev_data = self.data[idx[:dev_num]]
 
         self.val_label = self.label[idx[:val_num]]
-        self.train_label = self.label[idx[val_num:]]
+        if self.use_augmentation:
+            self.train_label = np.hstack( (self.label[idx[val_num:]], self.label[idx[val_num:]]) )
+        else:
+            self.train_label = self.label[idx[val_num:]]
         self.dev_label = self.label[idx[:dev_num]]
 
 

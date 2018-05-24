@@ -25,7 +25,7 @@ def get_cnn_model(input_tensor, reuse=False):
         conv_b1 = tf.get_variable('conv_b1', initializer=tf.zeros([64]), dtype=tf.float32)
         # conv_b1 = tf.zeros(shape=[64] ,name='conv_b1', dtype=tf.float32) 
         activation = tf.nn.conv2d(input_tensor, conv_w1, strides=(1,1,1,1), padding='VALID', name='conv_activation1') + conv_b1 #(1*297*64)
-        relu_out = tf.nn.relu(activation, name='conv_relu1') 
+        relu_out = tf.nn.leaky_relu(activation, alpha=0.02, name='conv_relu1') 
         pooling_out = tf.nn.max_pool(relu_out, ksize=(1,1,3,1), strides=(1,1,3,1), padding='VALID', name='conv_pool1') #(1*99*64)
         cnn_out = tf.squeeze(pooling_out, axis=1)
         #new_dim = pooling_out.shape[-1].value * pooling_out.shape[-2].value * pooling_out.shape[-3].value

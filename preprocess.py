@@ -54,10 +54,13 @@ def preprocess(is_train=True):
 
     num = len(data)
 
+    class_size = {}
+
     for c in range(num):
         print 'PROCESSING CLASS: %s\t\t\t%d / %d' % (CLASS_NAMES[c], c, num)
         sys.stdout.flush()
         num_instance = len(data[c])
+        class_size[CLASS_NAMES[c]] = num_instance
         one_hot_data = np.zeros([num_instance, 4, len(data[c][0]), 1], dtype=np.float32)
         for i in range(num_instance):
             one_hot_data[i] = seq2matrix(data[c][i])
@@ -69,9 +72,10 @@ def preprocess(is_train=True):
             np.save('./data/label_%s' % CLASS_NAMES[c], curr_label)
         else:
             np.save('./data/test_data_%s' % CLASS_NAMES[c], one_hot_data)
+    # print class_size
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Preprocess the data')
-    parser.add_argument('--test', '-t', action='store_true', help='using test mode')
-    args = parser.parse_args
+    parser.add_argument('-test', '-t', action='store_true', help='using test mode')
+    args = parser.parse_args()
     preprocess(not args.test)

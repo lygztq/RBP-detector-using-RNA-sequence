@@ -8,7 +8,7 @@ from model.param_init import kaiming_normal
 from data_utils.data_manager import DataManager
 from data_utils.class_name import CLASS_NAMES
 
-class RNA_model(object):
+class test_RNA_model(object):
     """
     The class of model structure
 
@@ -29,7 +29,6 @@ class RNA_model(object):
     - reg_strength:         the strength of regularization
     - use_reg:              use regularization or not
     - leaky_relu_alpha:     alpha for leaky ReLU
-    - plot:                 whether plot the training process
 
     """
     # TODO: test()
@@ -51,7 +50,6 @@ class RNA_model(object):
         self.reg_strength = kwargs.pop('reg_strength', 0.0)
         self.use_reg = kwargs.pop('use_reg', False)
         self.leaky_relu_alpha = kwargs.pop('leaky_relu_alpha', 0.01)
-        self.plot = kwargs.pop('plot', False)
 
         # do some check
         if self.cls_name not in CLASS_NAMES:
@@ -95,22 +93,32 @@ class RNA_model(object):
         with tf.variable_scope('fc_net', reuse=reuse):
             fc_w1 = tf.get_variable('fc_w1', initializer=kaiming_normal((nn_out.shape[1].value, self.fc_hidden_num)), dtype=tf.float32)
             fc_b1 = tf.get_variable('fc_b1', initializer=tf.zeros([self.fc_hidden_num]), dtype=tf.float32)
-            # fc_b1 = tf.zeros(name='fc_b1', shape=(self.fc_hidden_num), dtype=tf.float32)
-            fc_w2 = tf.get_variable('fc_w2', initializer=kaiming_normal((self.fc_hidden_num, 1)), dtype=tf.float32)
-            fc_b2 = tf.get_variable('fc_b2', initializer=tf.zeros([1]), dtype=tf.float32)
-            # fc_b2 = tf.zeros(name='fc_b2', shape=(1), dtype=tf.float32)
+            fc_w2 = tf.get_variable('fc_w2', initializer=kaiming_normal((self.fc_hidden_num, self.fc_hidden_num)), dtype=tf.float32)
+            fc_b2 = tf.get_variable('fc_b2', initializer=tf.zeros([self.fc_hidden_num]), dtype=tf.float32)
+            fc_w3 = tf.get_variable('fc_w3', initializer=kaiming_normal((self.fc_hidden_num, self.fc_hidden_num)), dtype=tf.float32)
+            fc_b3 = tf.get_variable('fc_b3', initializer=tf.zeros([self.fc_hidden_num]), dtype=tf.float32)
+            fc_w4 = tf.get_variable('fc_w4', initializer=kaiming_normal((self.fc_hidden_num, 1)), dtype=tf.float32)
+            fc_b4 = tf.get_variable('fc_b4', initializer=tf.zeros([1]), dtype=tf.float32)
+
             dropout_nn_out = tf.nn.dropout(nn_out, 2*keep_prob)
+            
             fc1_out = tf.nn.leaky_relu(tf.matmul(dropout_nn_out, fc_w1) + fc_b1, alpha=self.leaky_relu_alpha)
             dropout_fc1_out = tf.nn.dropout(fc1_out, keep_prob)
-            fc2_out = tf.matmul(dropout_fc1_out, fc_w2) + fc_b2
+            
+            fc2_out = tf.nn.leaky_relu(tf.matmul(dropout_fc1_out, fc_w2) + fc_b2, alpha=self.leaky_relu_alpha)
+            dropout_fc2_out = tf.nn.dropout(fc2_out, keep_prob)
 
-        result = (tf.sigmoid(fc2_out) > 0.5)
-        return fc2_out, result
+            fc3_out = tf.nn.leaky_relu(tf.matmul(dropout_fc2_out, fc_w3) + fc_b3, alpha=self.leaky_relu_alpha)
+            dropout_fc3_out = tf.nn.dropout(fc3_out, keep_prob)
+
+            fc4_out = tf.matmul(dropout_fc3_out, fc_w4) + fc_b4
+
+        result = (tf.sigmoid(fc4_out) > 0.5)
+        return fc4_out, result
 
 
 
     def train(self):
-        tf.reset_default_graph()
         # check
         if not self.is_train:
             raise TypeError('This model is not for training.')
@@ -145,7 +153,10 @@ class RNA_model(object):
             with tf.variable_scope('fc_net', reuse=True):
                 fc_w1 = tf.get_variable('fc_w1')
                 fc_w2 = tf.get_variable('fc_w2')
-            reg_loss = tf.nn.l2_loss(conv_w1) + tf.nn.l2_loss(fc_w1) + tf.nn.l2_loss(fc_w2)
+                fc_w3 = tf.get_variable('fc_w3')
+                fc_w4 = tf.get_variable('fc_w4')
+            reg_loss = tf.nn.l2_loss(conv_w1) + tf.nn.l2_loss(fc_w1) + tf.nn.l2_loss(fc_w2) \
+                        + tf.nn.l2_loss(fc_w3) + tf.nn.l2_loss(fc_w4)
             loss = data_loss + self.reg_strength * reg_loss
         else:
             loss = data_loss
@@ -203,33 +214,17 @@ class RNA_model(object):
                         val_acc_hist.append(val_acc)
                         break
             saver.save(sess, self.model_save_path)
-        if not os.path.exists('./train_record'):
-            os.makedirs('./train_record')
-        if self.plot:
-            plt.figure(1)
-            plt.grid(True)
-            plt.plot(np.array(train_acc_hist), 'b-', label="train_acc")
-            plt.plot(np.array(val_acc_hist), 'y-', label="val_acc")
-            plt.legend()
-            plt.show()
-            plt.savefig('./train_record/%s_train_record.png' % self.cls_name, format='png')
-        
-        else:
-            with open('./train_record/%s_train_record'%self.cls_name, 'w') as rec_file:
-                rec_file.write("train_acc:\n")
-                for i in train_acc_hist:
-                    rec_file.write(str(i) + '\t')
-                rec_file.write("\nval_acc:\n")
-                for i in val_acc_hist:
-                    rec_file.write(str(i) + '\t')
-
-        final_acc = val_acc_hist[-1]
+        plt.figure(1)
+        plt.grid(True)
+        plt.plot(np.array(train_acc_hist), 'b-', label="train_acc")
+        plt.plot(np.array(val_acc_hist), 'y-', label="val_acc")
+        plt.legend()
+        plt.show()
+        plt.savefig('./train_record.png', format='png')
         print('Finish training')
         sys.stdout.flush()
-        return final_acc
     
     def test(self):
-        tf.reset_default_graph()
         if self.is_train:
             raise TypeError('This model is not for test')
         

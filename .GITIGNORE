@@ -21,3 +21,7 @@
 # checkpoints
 /checkpoint/*
 !/checkpoint/.
+
+# train_record
+val_acc_record
+/train_record
