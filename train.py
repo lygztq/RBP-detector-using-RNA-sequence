@@ -33,9 +33,9 @@ def train():
             acc = single_class_train(cls_name)
             cnt+=1
             acc_file.write(cls_name)
-            acc_file.write('\t\t')
+            acc_file.write('\t\t\t')
             acc_file.write(str(CLASS_SIZE[cls_name]))
-            acc_file.write('\t\t')
+            acc_file.write('\t\t\t')
             acc_file.write(str(acc) + '\n')
 
 if __name__ == '__main__':

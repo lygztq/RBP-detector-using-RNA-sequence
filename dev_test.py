@@ -9,7 +9,7 @@ batch_size = 256
 
 model = RNA_model(
     cls_name=cls_name, batch_size=batch_size,
-    test_set_path='./data', is_train=False, use_rnn=False
+    test_set_path='./data', is_train=False, use_rnn=True
 )
 
 data, result = model.test()

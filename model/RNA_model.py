@@ -165,6 +165,7 @@ class RNA_model(object):
 
         train_acc_hist = []
         val_acc_hist = []
+        best_acc = 0.0
 
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
@@ -192,7 +193,6 @@ class RNA_model(object):
                 sess.run(iterator.initializer, feed_dict={X:data_manager.val_data, y:data_manager.val_label})
                 val_acc = 0.0
                 cnt = 0
-                best_acc = 0.0
                 while True:
                     try:
                         curr_result, curr_label = sess.run([result, batch_label], feed_dict={dropout_keep_prob: 1.0})
@@ -205,8 +205,8 @@ class RNA_model(object):
                             best_acc = val_acc
                             saver.save(sess, self.model_save_path)
                         break
-                if best_acc <= 0.76:
-                    saver.save(sess, self.model_save_path)
+            if best_acc <= 0.76:
+                saver.save(sess, self.model_save_path)
         if not os.path.exists('./train_record'):
             os.makedirs('./train_record')
         if self.plot:
