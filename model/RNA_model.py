@@ -102,6 +102,7 @@ class RNA_model(object):
             fc1_out = tf.nn.leaky_relu(tf.matmul(dropout_nn_out, fc_w1) + fc_b1, alpha=self.leaky_relu_alpha)
             dropout_fc1_out = tf.nn.dropout(fc1_out, keep_prob)
             fc2_out = tf.matmul(dropout_fc1_out, fc_w2) + fc_b2
+            #batch_out = tf.layers.batch_normalization(fc2_out, name='batchnorm2')
 
         result = (tf.sigmoid(fc2_out) > 0.5)
         return fc2_out, result
