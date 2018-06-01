@@ -2,6 +2,8 @@ import tensorflow as tf
 import numpy as np
 from data_utils.load_data import load_dataset, load_test_data
 import data_utils.class_name
+import data_utils.RNA_process
+from data_utils.pyrnashapes import rnashapes
 
 class DataManager(object):
     """
@@ -27,8 +29,9 @@ class DataManager(object):
         else:
             self.data = load_test_data(cls_name, dataset_path)
             self.num_data = self.data.shape[0]
+        self.rnashapes = [rnashapes(data_utils.RNA_process.matrix2seq(x)) for x in self.data]
         print('From DataManager: Loaded dataset size is %d, name is %s' % (self.num_data, cls_name))
-            
+
 
     def _train_val_split(self):
         """
