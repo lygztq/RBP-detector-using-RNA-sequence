@@ -1,7 +1,7 @@
 import subprocess
 
 def rnashapes(rna):
-    result = subprocess.run(['./rnashapes', '-O', 'D{$%s}', rna], stdout = subprocess.PIPE)
+    result = subprocess.run(['./data_utils/rnashapes', '-O', 'D{$%s}', rna], stdout = subprocess.PIPE)
     result.check_returncode()
     result = result.stdout.decode('utf8')
     result = result[result.index('$') + 1:]
