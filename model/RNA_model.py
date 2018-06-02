@@ -1,7 +1,7 @@
 import sys, os
 import tensorflow as tf
 import numpy as np
-from model.cnn import get_cnn_model
+from model.cnn import get_seq_cnn_model, get_shape_cnn_model
 from model.rnn import biLSTM
 from model.param_init import kaiming_normal
 from data_utils.data_manager import DataManager
@@ -29,6 +29,9 @@ class RNA_model(object):
     - use_reg:              use regularization or not
     - leaky_relu_alpha:     alpha for leaky ReLU
     - plot:                 whether plot the training process
+    - shape_alpha:          the strength of shape effect, i.e. cnn_out = seq_cnn_out + alpha * shape_cnn_out
+    - data_augmentation:    Whether use data augmentation
+    - dev_mode:             development mode
 
     """
     # TODO: test()
@@ -51,6 +54,9 @@ class RNA_model(object):
         self.use_reg = kwargs.pop('use_reg', False)
         self.leaky_relu_alpha = kwargs.pop('leaky_relu_alpha', 0.01)
         self.plot = kwargs.pop('plot', False)
+        self.shape_alpha = kwargs.pop('shape_alpha', 0.5)
+        self.data_augmentation = kwargs.pop('data_augmentation', False)
+        self.dev_mode = kwargs.pop('dev_mode', False)
 
         # do some check
         if self.cls_name not in CLASS_NAMES:
@@ -68,7 +74,7 @@ class RNA_model(object):
                 raise ValueError('Invalid path or can not find checkpoints for this model')
     
     
-    def build_model(self, batch_data, keep_prob, reuse=False):
+    def build_model(self, batch_data, batch_shape, keep_prob, reuse=False):
         """
         Build computational graph for model
         :param batch_data: input tensor
@@ -79,8 +85,9 @@ class RNA_model(object):
         Return the output of model
         """
         # cnn part
-        cnn_out = get_cnn_model(batch_data, reuse=reuse) #(N, 99, 64)
-
+        seq_cnn_out = get_seq_cnn_model(batch_data, reuse=reuse) #(N, 99, 64)
+        shape_cnn_out = get_shape_cnn_model(batch_shape, reuse=reuse) #(N, 99, 64)
+        cnn_out = seq_cnn_out + self.shape_alpha * shape_cnn_out #(N, 99, 64)
 
         # rnn part
         if self.use_rnn:
@@ -116,23 +123,29 @@ class RNA_model(object):
             raise TypeError('This model is not for training.')
 
         # get the dataset
-        data_manager = DataManager(cls_name=self.cls_name, dataset_path=self.dataset_path)
+        data_manager = DataManager(cls_name=self.cls_name, dataset_path=self.dataset_path, use_augmentation=self.data_augmentation)
         sys.stdout.flush()
-        train_data, train_label = data_manager.train_data, data_manager.train_label
+
+        if self.dev_mode:
+            train_data, train_label, train_shape = data_manager.dev_data, data_manager.dev_label, data_manager.dev_rnashapes
+        else:
+            train_data, train_label, train_shape = data_manager.train_data, data_manager.train_label, data_manager.train_rnashapes
+        
         num_train_data = train_data.shape[0]
         X = tf.placeholder(train_data.dtype, [None]+list(train_data.shape[1:]), name='input_data')
+        S = tf.placeholder(train_shape.dtype, [None]+list(train_shape.shape[1:]), name='input_shape')
         y = tf.placeholder(train_label.dtype, [None]+list(train_label.shape[1:]), name='input_label')
-        dataset = tf.data.Dataset.from_tensor_slices((X, y))
+        dataset = tf.data.Dataset.from_tensor_slices((X, S, y))
         dataset = dataset.shuffle(buffer_size=8000)
         batched_dataset = dataset.batch(self.batch_size)
 
         iterator = batched_dataset.make_initializable_iterator()
-        batch_data, batch_label = iterator.get_next()
+        batch_data, batch_shape, batch_label = iterator.get_next()
         batch_label = tf.expand_dims(batch_label, -1)
         
         # build model and get parameters
         dropout_keep_prob = tf.placeholder(tf.float32, name='keep_prob')
-        fc2_out, result = self.build_model(batch_data, dropout_keep_prob)
+        fc2_out, result = self.build_model(batch_data, batch_shape, dropout_keep_prob)
         saver = tf.train.Saver()
 
         # training part
@@ -140,12 +153,14 @@ class RNA_model(object):
 
         # add regularization
         if self.use_reg:
-            with tf.variable_scope('cnn', reuse=True):
+            with tf.variable_scope('shape_cnn', reuse=True):
+                shape_conv_w1 = tf.get_variable('conv_w1')
+            with tf.variable_scope('seq_cnn', reuse=True):
                 conv_w1 = tf.get_variable('conv_w1')
             with tf.variable_scope('fc_net', reuse=True):
                 fc_w1 = tf.get_variable('fc_w1')
                 fc_w2 = tf.get_variable('fc_w2')
-            reg_loss = tf.nn.l2_loss(conv_w1) + tf.nn.l2_loss(fc_w1) + tf.nn.l2_loss(fc_w2)
+            reg_loss = tf.nn.l2_loss(conv_w1) + tf.nn.l2_loss(fc_w1) + tf.nn.l2_loss(fc_w2) + tf.nn.l2_loss(shape_conv_w1)
             loss = data_loss + self.reg_strength * reg_loss
         else:
             loss = data_loss
@@ -171,7 +186,7 @@ class RNA_model(object):
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
             for i in range(self.num_epoch):
-                sess.run(iterator.initializer, feed_dict={X:train_data, y:train_label})
+                sess.run(iterator.initializer, feed_dict={X:train_data, S:train_shape, y:train_label})
                 cnt = 0
                 last_loss, acc = 0.0, 0.0
                 while True:
@@ -240,22 +255,23 @@ class RNA_model(object):
         
         # get the dataset
         data_manager = DataManager(self.test_set_path, self.cls_name, is_train=False)
-        test_data = data_manager.data
+        test_data, test_shape = data_manager.data, data_manager.rnashapes
         num_test_data = test_data.shape[0]
         X = tf.placeholder(test_data.dtype, [None]+list(test_data.shape[1:]), name='input_data')
-        dataset = tf.data.Dataset.from_tensor_slices(X)
+        S = tf.placeholder(test_shape.dtype, [None]+list(test_shape.shape[1:]), name='input_shape')
+        dataset = tf.data.Dataset.from_tensor_slices((X, S))
         dataset = dataset.batch(self.batch_size)
 
         iterator = dataset.make_initializable_iterator()
-        batch_data = iterator.get_next()
+        batch_data, batch_shape = iterator.get_next()
         
         dropout_keep_prob = tf.placeholder(tf.float32, name='keep_prob')
-        _, result = self.build_model(batch_data, dropout_keep_prob, reuse=False)
+        _, result = self.build_model(batch_data, batch_shape,dropout_keep_prob, reuse=False)
         saver = tf.train.Saver()
 
         with tf.Session() as sess:
             #sess.run(tf.global_variables_initializer())
-            sess.run(iterator.initializer, feed_dict={X:test_data})
+            sess.run(iterator.initializer, feed_dict={X:test_data, S:test_shape})
             saver.restore(sess, self.model_save_path)
             result_data = []
             result_label = []

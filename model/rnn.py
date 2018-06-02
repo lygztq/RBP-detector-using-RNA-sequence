@@ -35,7 +35,7 @@ def biLSTM(input_tensor, reuse=False):
                 scope='rnn'
             )
         stack_output = tf.stack(rnn_outputs, axis=1)
-        print(stack_output.shape)
+        #print(stack_output.shape)
         dim = np.prod([i.value for i in stack_output.shape[1:]])
         flatten_output = tf.reshape(stack_output, shape=[-1, dim])
     return flatten_output

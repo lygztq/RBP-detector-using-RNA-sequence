@@ -77,12 +77,15 @@ def load_dataset(cls_name, path='../data'):
     """
     data_file_name = 'data_%s.npy' % cls_name
     label_file_name = 'label_%s.npy' % cls_name
+    shape_file_name = 'shape_%s.npy' % cls_name
     data_path = os.path.join(path, data_file_name)
     label_path = os.path.join(path, label_file_name)
+    shape_path = os.path.join(path, shape_file_name)
 
     data = np.load(data_path)
     label = np.load(label_path)
-    return data, label
+    shape = np.load(shape_path)
+    return data, shape, label
 
 
 def load_test_data(cls_name, path='../data'):
@@ -90,10 +93,13 @@ def load_test_data(cls_name, path='../data'):
     Load preprocessed test data without label
     """
     test_data_file_name = 'test_data_%s.npy' % cls_name
+    test_shape_file_name = 'test_shape_%s.npy' % cls_name
     test_data_path = os.path.join(path, test_data_file_name)
+    test_shape_path = os.path.join(path, test_shape_file_name)
     
     test_data = np.load(test_data_path)
-    return test_data
+    test_shape = np.load(test_shape_path)
+    return test_data, test_shape
 
 # test
 # data_path = '../data/AGO1/train'
