@@ -18,3 +18,8 @@ You can change the model parameters in `train.py`. For model training, run `pyth
 
 ## Test
 run `python test.py`
+
+## Reference
+[Prediction of RNA-protein sequence and structure binding preferences using deep convolutional and recurrent neural networks](https://www.biorxiv.org/content/biorxiv/early/2017/06/05/146175.full.pdf)
+
+[Predicting the sequence specificities of DNA-and RNA-binding proteins by deep learning](https://www.nature.com/articles/nbt.3300.pdf)
