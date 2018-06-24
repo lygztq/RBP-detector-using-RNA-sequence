@@ -2,8 +2,8 @@ import tensorflow as tf
 import numpy as np
 from data_utils.load_data import load_dataset, load_test_data
 import data_utils.class_name
-import data_utils.RNA_process
-from data_utils.pyrnashapes import rnashapes
+# import data_utils.RNA_process
+# from data_utils.pyrnashapes import rnashapes
 
 class DataManager(object):
     """
@@ -21,7 +21,7 @@ class DataManager(object):
         self.is_train = is_train
         self.use_augmentation = use_augmentation
         if self.is_train:
-            self.data, self.rnashapes, self.label = load_dataset(cls_name, dataset_path)
+            self.data, self.label = load_dataset(cls_name, dataset_path)
             # print("Processing RNA shapes")
             # self.rnashapes = [rnashapes(data_utils.RNA_process.matrix2seq(x)) for x in self.data]
             self.num_data = self.data.shape[0]
@@ -29,7 +29,7 @@ class DataManager(object):
             if self.use_augmentation:
                 print('training set with data augmentation is %d' % self.train_data.shape[0])
         else:
-            self.data, self.rnashapes = load_test_data(cls_name, dataset_path)
+            self.data = load_test_data(cls_name, dataset_path)
             self.num_data = self.data.shape[0]
             # print("Processing RNA shapes")
             # self.rnashapes = [rnashapes(data_utils.RNA_process.matrix2seq(x)) for x in self.data]
@@ -49,23 +49,19 @@ class DataManager(object):
 
         # Validation set
         self.val_data = self.data[idx[:val_num]]
-        self.val_rnashapes = self.rnashapes[idx[:val_num]]
         self.val_label = self.label[idx[:val_num]]
 
         # Training set
         if self.use_augmentation:
             self.train_data = np.vstack( (self.data[idx[val_num:]], self.data[idx[val_num:],:,::-1]) )
-            self.train_rnashapes = np.vstack( (self.rnashapes[idx[val_num:]], self.rnashapes[idx[val_num:],:,::-1]) )
             self.train_label = np.hstack( (self.label[idx[val_num:]], self.label[idx[val_num:]]) )
         else:
             self.train_data = self.data[idx[val_num:]]
-            self.train_rnashapes = self.rnashapes[idx[val_num:]]
             self.train_label = self.label[idx[val_num:]]
 
         # Development set 
         self.dev_data = self.data[idx[:dev_num]]
         self.dev_label = self.label[idx[:dev_num]]
-        self.dev_rnashapes = self.rnashapes[idx[:dev_num]]
 
 ## Test for data manager
 # test_name = class_name.CLASS_NAMES[0]

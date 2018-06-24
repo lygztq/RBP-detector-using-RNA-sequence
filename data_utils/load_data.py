@@ -2,12 +2,12 @@ import numpy as np
 from data_utils.class_name import CLASS_NAMES, CLASS_NUM
 import os
 
-def write_file(file_path, data, with_label=False, label=None):
+def write_file(file_path, data, with_label=False, label=None, prob=None):
     with open(file_path, 'w') as target_file:
         for i, d in enumerate(data):
             target_file.write(d+'\t')
             if with_label:
-                target_file.write(str(label[i]))
+                target_file.write(str(label[i]) + '\t' + str(prob[i]))
             target_file.write('\n')
 
 
@@ -55,11 +55,11 @@ def read_dirs(dir_path, with_label=True):
     for n in names:
         try:
             if with_label:
-                file_name = os.path.join(dir_path, n, 'train')
+                file_name = os.path.join(dir_path, n)
                 data, label = read_file(file_name)
                 labels[n] = label
             else:
-                file_name = os.path.join(dir_path, n, 'test')
+                file_name = os.path.join(dir_path, n)
                 data = read_file(file_name, with_label=False)
             datas[n] = data
         except:
@@ -77,15 +77,12 @@ def load_dataset(cls_name, path='../data'):
     """
     data_file_name = 'data_%s.npy' % cls_name
     label_file_name = 'label_%s.npy' % cls_name
-    shape_file_name = 'shape_%s.npy' % cls_name
     data_path = os.path.join(path, data_file_name)
     label_path = os.path.join(path, label_file_name)
-    shape_path = os.path.join(path, shape_file_name)
 
     data = np.load(data_path)
     label = np.load(label_path)
-    shape = np.load(shape_path)
-    return data, shape, label
+    return data, label
 
 
 def load_test_data(cls_name, path='../data'):
@@ -93,13 +90,10 @@ def load_test_data(cls_name, path='../data'):
     Load preprocessed test data without label
     """
     test_data_file_name = 'test_data_%s.npy' % cls_name
-    test_shape_file_name = 'test_shape_%s.npy' % cls_name
     test_data_path = os.path.join(path, test_data_file_name)
-    test_shape_path = os.path.join(path, test_shape_file_name)
     
     test_data = np.load(test_data_path)
-    test_shape = np.load(test_shape_path)
-    return test_data, test_shape
+    return test_data
 
 # test
 # data_path = '../data/AGO1/train'

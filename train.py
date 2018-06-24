@@ -8,17 +8,17 @@ from model.RNA_model import RNA_model
 batch_size = 64
 basis_learning_rate = 1e-3
 learning_rate_decay=0.02
-reg_strength = 1e-4
-basis_num_epoch = 120
+reg_strength = 5e-4
+basis_num_epoch = 80
 
 def single_class_train(cls_name):
-    num_epoch = basis_num_epoch * CLASS_SIZE[cls_name] // 8000
+    num_epoch = basis_num_epoch #* CLASS_SIZE[cls_name] // 8000
     model = RNA_model(
         cls_name=cls_name, batch_size=batch_size,
         num_epoch=num_epoch, learning_rate=basis_learning_rate,
         learning_rate_decay=learning_rate_decay, dataset_path='./data', 
-        keep_prob=0.375, use_decay=True, use_rnn=False, use_reg=True,
-        reg_strength=reg_strength
+        keep_prob=0.36, use_decay=True, use_rnn=True, use_reg=True,
+        reg_strength=reg_strength, data_augmentation=False
     )
     acc = model.train()
     return acc

@@ -12,7 +12,7 @@ model = RNA_model(
     test_set_path='./data', is_train=False, use_rnn=True
 )
 
-data, result = model.test()
-processed_data, processed_result = process_batch_result(data, result)
+data, result, prob = model.test()
+processed_data, processed_result, processed_prob = process_batch_result(data, result, prob)
 file_path = './data/%s/pred_test' % cls_name
-write_file(file_path, processed_data, with_label=True, label=processed_result)
+write_file(file_path, processed_data, with_label=True, label=processed_result, prob=processed_prob)

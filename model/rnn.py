@@ -11,7 +11,7 @@ def biLSTM(input_tensor, reuse=False):
     # current data input shape: (batch_size, 99, 64)
     # needed: 99 * [(batch_size, 64)], a 1-dim list with len 99
     N, T, D = [i.value for i in input_tensor.shape]
-    hidden_dim = D//2
+    hidden_dim = D//4
     input_tensor = tf.unstack(input_tensor, T, axis=1)
 
     # define lstm cells, let the hidden cell num is D
@@ -35,7 +35,7 @@ def biLSTM(input_tensor, reuse=False):
                 scope='rnn'
             )
         stack_output = tf.stack(rnn_outputs, axis=1)
-        #print(stack_output.shape)
+        print(stack_output.shape)
         dim = np.prod([i.value for i in stack_output.shape[1:]])
         flatten_output = tf.reshape(stack_output, shape=[-1, dim])
     return flatten_output

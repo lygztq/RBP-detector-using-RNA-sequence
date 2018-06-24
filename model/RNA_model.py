@@ -1,7 +1,7 @@
 import sys, os
 import tensorflow as tf
 import numpy as np
-from model.cnn import get_seq_cnn_model, get_shape_cnn_model
+from model.cnn import get_cnn_model
 from model.rnn import biLSTM
 from model.param_init import kaiming_normal
 from data_utils.data_manager import DataManager
@@ -20,7 +20,7 @@ class RNA_model(object):
     - model_save_path:      the place that saves the model parameters and checkpoints
     - learning_rate_decay:  decay rate for learning rate
     - use_decay:            whether or not using learning rate decay
-    - fc_hidden_num:        num of hidden layer in fully-connented net
+    - fc_hidden_num:        basis num of hidden layer in fully-connented net
     - is_train:             train or test
     - test_set_path:        the path of test dataset
     - keep_prob:            the keep probability for dropout 
@@ -29,7 +29,6 @@ class RNA_model(object):
     - use_reg:              use regularization or not
     - leaky_relu_alpha:     alpha for leaky ReLU
     - plot:                 whether plot the training process
-    - shape_alpha:          the strength of shape effect, i.e. cnn_out = seq_cnn_out + alpha * shape_cnn_out
     - data_augmentation:    Whether use data augmentation
     - dev_mode:             development mode
 
@@ -44,7 +43,7 @@ class RNA_model(object):
         self.learning_rate = kwargs.pop('learning_rate', 1e-4)
         self.model_save_path = kwargs.pop('model_save_path', './checkpoint/%s/model.ckpt'%self.cls_name)
         self.learning_rate_decay = kwargs.pop('learning_rate_decay', 0.0) # 0.05 is ok
-        self.fc_hidden_num = kwargs.pop('fc_hidden_num', 48)
+        self.fc_hidden_num = kwargs.pop('fc_hidden_num', 512)
         self.is_train = kwargs.pop('is_train', True)
         self.use_decay = kwargs.pop('use_decay', False)
         self.test_set_path = kwargs.pop('test_set_path', None)
@@ -54,7 +53,6 @@ class RNA_model(object):
         self.use_reg = kwargs.pop('use_reg', False)
         self.leaky_relu_alpha = kwargs.pop('leaky_relu_alpha', 0.01)
         self.plot = kwargs.pop('plot', False)
-        self.shape_alpha = kwargs.pop('shape_alpha', 0.5)
         self.data_augmentation = kwargs.pop('data_augmentation', False)
         self.dev_mode = kwargs.pop('dev_mode', False)
 
@@ -74,7 +72,7 @@ class RNA_model(object):
                 raise ValueError('Invalid path or can not find checkpoints for this model')
     
     
-    def build_model(self, batch_data, batch_shape, keep_prob, reuse=False):
+    def build_model(self, batch_data, keep_prob, reuse=False):
         """
         Build computational graph for model
         :param batch_data: input tensor
@@ -85,9 +83,8 @@ class RNA_model(object):
         Return the output of model
         """
         # cnn part
-        seq_cnn_out = get_seq_cnn_model(batch_data, reuse=reuse) #(N, 99, 64)
-        shape_cnn_out = get_shape_cnn_model(batch_shape, reuse=reuse) #(N, 99, 64)
-        cnn_out = seq_cnn_out + self.shape_alpha * shape_cnn_out #(N, 99, 64)
+        cnn_out = get_cnn_model(batch_data, reuse=reuse) #(N, 99, 64)
+
 
         # rnn part
         if self.use_rnn:
@@ -101,18 +98,24 @@ class RNA_model(object):
         with tf.variable_scope('fc_net', reuse=reuse):
             fc_w1 = tf.get_variable('fc_w1', initializer=kaiming_normal((nn_out.shape[1].value, self.fc_hidden_num)), dtype=tf.float32)
             fc_b1 = tf.get_variable('fc_b1', initializer=tf.zeros([self.fc_hidden_num]), dtype=tf.float32)
-            # fc_b1 = tf.zeros(name='fc_b1', shape=(self.fc_hidden_num), dtype=tf.float32)
-            fc_w2 = tf.get_variable('fc_w2', initializer=kaiming_normal((self.fc_hidden_num, 1)), dtype=tf.float32)
-            fc_b2 = tf.get_variable('fc_b2', initializer=tf.zeros([1]), dtype=tf.float32)
-            # fc_b2 = tf.zeros(name='fc_b2', shape=(1), dtype=tf.float32)
-            dropout_nn_out = tf.nn.dropout(nn_out, keep_prob)
-            fc1_out = tf.nn.leaky_relu(tf.matmul(dropout_nn_out, fc_w1) + fc_b1, alpha=self.leaky_relu_alpha)
-            dropout_fc1_out = tf.nn.dropout(fc1_out, keep_prob)
-            fc2_out = tf.matmul(dropout_fc1_out, fc_w2) + fc_b2
-            #batch_out = tf.layers.batch_normalization(fc2_out, name='batchnorm2')
+            
+            fc_w2 = tf.get_variable('fc_w2', initializer=kaiming_normal((self.fc_hidden_num, (self.fc_hidden_num//2))), dtype=tf.float32)
+            fc_b2 = tf.get_variable('fc_b2', initializer=tf.zeros([(self.fc_hidden_num//2)]), dtype=tf.float32)
+            
+            fc_w3 = tf.get_variable('fc_w3', initializer=kaiming_normal(((self.fc_hidden_num//2), 1)), dtype=tf.float32)
+            fc_b3 = tf.get_variable('fc_b3', initializer=tf.zeros([1]), dtype=tf.float32)
 
-        result = (tf.sigmoid(fc2_out) > 0.5)
-        return fc2_out, result
+            dropout_nn_out = tf.nn.dropout(nn_out, keep_prob)
+            #fc1_out = tf.nn.leaky_relu(tf.matmul(dropout_nn_out, fc_w1) + fc_b1, alpha=self.leaky_relu_alpha)
+            fc1_out = tf.sigmoid(tf.matmul(dropout_nn_out, fc_w1) + fc_b1)
+            dropout_fc1_out = tf.nn.dropout(fc1_out, keep_prob)
+            fc2_out = tf.sigmoid(tf.matmul(dropout_fc1_out, fc_w2) + fc_b2)
+            dropout_fc2_out = tf.nn.dropout(fc2_out, keep_prob)
+            fc3_out = tf.matmul(dropout_fc2_out, fc_w3) + fc_b3
+
+        prob = tf.sigmoid(fc3_out)
+        result = (prob > 0.5)
+        return fc3_out, result, prob
 
 
 
@@ -125,27 +128,26 @@ class RNA_model(object):
         # get the dataset
         data_manager = DataManager(cls_name=self.cls_name, dataset_path=self.dataset_path, use_augmentation=self.data_augmentation)
         sys.stdout.flush()
-
+        
         if self.dev_mode:
-            train_data, train_label, train_shape = data_manager.dev_data, data_manager.dev_label, data_manager.dev_rnashapes
-        else:
-            train_data, train_label, train_shape = data_manager.train_data, data_manager.train_label, data_manager.train_rnashapes
+            train_data, train_label = data_manager.dev_data, data_manager.dev_label
+        else: 
+            train_data, train_label = data_manager.train_data, data_manager.train_label
         
         num_train_data = train_data.shape[0]
         X = tf.placeholder(train_data.dtype, [None]+list(train_data.shape[1:]), name='input_data')
-        S = tf.placeholder(train_shape.dtype, [None]+list(train_shape.shape[1:]), name='input_shape')
         y = tf.placeholder(train_label.dtype, [None]+list(train_label.shape[1:]), name='input_label')
-        dataset = tf.data.Dataset.from_tensor_slices((X, S, y))
+        dataset = tf.data.Dataset.from_tensor_slices((X, y))
         dataset = dataset.shuffle(buffer_size=8000)
         batched_dataset = dataset.batch(self.batch_size)
 
         iterator = batched_dataset.make_initializable_iterator()
-        batch_data, batch_shape, batch_label = iterator.get_next()
+        batch_data, batch_label = iterator.get_next()
         batch_label = tf.expand_dims(batch_label, -1)
         
         # build model and get parameters
         dropout_keep_prob = tf.placeholder(tf.float32, name='keep_prob')
-        fc2_out, result = self.build_model(batch_data, batch_shape, dropout_keep_prob)
+        fc2_out, result, _ = self.build_model(batch_data, dropout_keep_prob)
         saver = tf.train.Saver()
 
         # training part
@@ -153,14 +155,12 @@ class RNA_model(object):
 
         # add regularization
         if self.use_reg:
-            with tf.variable_scope('shape_cnn', reuse=True):
-                shape_conv_w1 = tf.get_variable('conv_w1')
-            with tf.variable_scope('seq_cnn', reuse=True):
+            with tf.variable_scope('cnn', reuse=True):
                 conv_w1 = tf.get_variable('conv_w1')
             with tf.variable_scope('fc_net', reuse=True):
                 fc_w1 = tf.get_variable('fc_w1')
                 fc_w2 = tf.get_variable('fc_w2')
-            reg_loss = tf.nn.l2_loss(conv_w1) + tf.nn.l2_loss(fc_w1) + tf.nn.l2_loss(fc_w2) + tf.nn.l2_loss(shape_conv_w1)
+            reg_loss = tf.nn.l2_loss(conv_w1) + tf.nn.l2_loss(fc_w1) + tf.nn.l2_loss(fc_w2)
             loss = data_loss + self.reg_strength * reg_loss
         else:
             loss = data_loss
@@ -186,7 +186,7 @@ class RNA_model(object):
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
             for i in range(self.num_epoch):
-                sess.run(iterator.initializer, feed_dict={X:train_data, S:train_shape, y:train_label})
+                sess.run(iterator.initializer, feed_dict={X:train_data, y:train_label})
                 cnt = 0
                 last_loss, acc = 0.0, 0.0
                 while True:
@@ -217,7 +217,7 @@ class RNA_model(object):
                     except tf.errors.OutOfRangeError:
                         print('validation acc: %f' % val_acc)
                         val_acc_hist.append(val_acc)
-                        if val_acc > best_acc and val_acc > 0.76:
+                        if val_acc > best_acc and val_acc > 0.65:
                             best_acc = val_acc
                             saver.save(sess, self.model_save_path)
                         break
@@ -255,35 +255,36 @@ class RNA_model(object):
         
         # get the dataset
         data_manager = DataManager(self.test_set_path, self.cls_name, is_train=False)
-        test_data, test_shape = data_manager.data, data_manager.rnashapes
+        test_data = data_manager.data
         num_test_data = test_data.shape[0]
         X = tf.placeholder(test_data.dtype, [None]+list(test_data.shape[1:]), name='input_data')
-        S = tf.placeholder(test_shape.dtype, [None]+list(test_shape.shape[1:]), name='input_shape')
-        dataset = tf.data.Dataset.from_tensor_slices((X, S))
+        dataset = tf.data.Dataset.from_tensor_slices(X)
         dataset = dataset.batch(self.batch_size)
 
         iterator = dataset.make_initializable_iterator()
-        batch_data, batch_shape = iterator.get_next()
+        batch_data = iterator.get_next()
         
         dropout_keep_prob = tf.placeholder(tf.float32, name='keep_prob')
-        _, result = self.build_model(batch_data, batch_shape,dropout_keep_prob, reuse=False)
+        _, result, prob = self.build_model(batch_data, dropout_keep_prob, reuse=False)
         saver = tf.train.Saver()
 
         with tf.Session() as sess:
             #sess.run(tf.global_variables_initializer())
-            sess.run(iterator.initializer, feed_dict={X:test_data, S:test_shape})
+            sess.run(iterator.initializer, feed_dict={X:test_data})
             saver.restore(sess, self.model_save_path)
             result_data = []
+            result_prob = []
             result_label = []
             while True:
                 try:
-                    curr_data, curr_result = sess.run([batch_data, result], feed_dict={dropout_keep_prob: 1.0})
+                    curr_data, curr_result, curr_prob = sess.run([batch_data, result, prob], feed_dict={dropout_keep_prob: 1.0})
                     curr_result_int = curr_result.astype(np.int)
                     result_data.append(curr_data)
+                    result_prob.append(curr_prob)
                     result_label.append(curr_result)
                 except tf.errors.OutOfRangeError:
                     break
-        return result_data, result_label
+        return result_data, result_label, result_prob
         
 
         

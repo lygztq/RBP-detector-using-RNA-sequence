@@ -1,24 +1,5 @@
 import numpy as np
 
-def shape2matrix(rnashape):
-    """
-    Change a RNA shape sequence(len=300) into a binary matrix.
-    e.g.
-        if '('=0, '.'=1, ')'=2
-        ..(.) --> [[0,1,0],[0,1,0],[1,0,0],[0,1,0],[0,0,1]]
-    :param rnashape:  a RNA shape sequence.
-    :return:        a binary matrix with size (300 x 3)
-    """
-    mat = np.zeros([3, len(rnashape), 1], dtype=np.float32)
-    for i in range(len(rnashape)):
-        if rnashape[i] == '(':
-            mat[0, i, 0] = 1
-        elif rnashape[i] == '.':
-            mat[1, i, 0] = 1
-        else:
-            mat[2, i, 0] = 1
-    return mat
-
 def seq2matrix(seq):
     """
     Change a RNA sequence(len=300) to a one-hot matrix representation.
@@ -54,18 +35,24 @@ def matrix2seq(matrix):
     return seq
 
 
-def process_batch_result(data, result):
+def process_batch_result(data, result, prob):
     """
     process the result from neural network into seq RNA
     :param data:    a list with len=batch_num, each element is a batch of 
                     RNA matrix with shape (Batch_size, 4, 300, 1)
+
     :param result:  a list with len=batch_num, each element is a batch of 
                     predicted result with shape (Batch_size, 1)
+
+    :param prob:    a list with len=batch_num, each element is a batch of 
+                    predicted probability result with shape (Batch_size, 1)
+
     :return:        the processed data and label
     """
     batch_num = len(data)
     datas = []
     results = []
+    probs = []
 
     for b in range(batch_num):
         batch_size = data[b].shape[0]
@@ -73,8 +60,9 @@ def process_batch_result(data, result):
             RNA_seq = matrix2seq(data[b][e])
             datas.append(RNA_seq)
             results.append(int(result[b][e][0]))
+            probs.append(prob[b][e][0])
     
-    return datas, results
+    return datas, results, probs
 
 
 
